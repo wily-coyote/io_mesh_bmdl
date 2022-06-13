@@ -1,6 +1,6 @@
-import bpy, struct, bmesh
+import bpy, struct, bmesh, os
 from bpy_extras.io_utils import ImportHelper, ExportHelper
-from bpy.props import StringProperty, BoolProperty, EnumProperty
+from bpy.props import StringProperty, BoolProperty, EnumProperty, CollectionProperty
 from bpy.types import Operator
 
 bl_info = {
@@ -28,9 +28,10 @@ def read_bmdl(context, filepath):
             for i in range(counts[1]):
                 faces.append([x for x in struct.unpack("<HHH", file.read(6))])
                 file.read(26)
-            me = bpy.data.meshes.new("bmdl")
+            name = os.path.splitext(os.path.basename(filepath))[0]
+            me = bpy.data.meshes.new(name)
             me.from_pydata([x[:3] for x in vertices],[],faces)
-            uvs = me.uv_layers.new(name="bmdl")
+            uvs = me.uv_layers.new(name=name)
             ob = bpy.data.objects.new(me.name, me)   
             for loop in me.loops:
                 idx = loop.vertex_index
@@ -89,9 +90,13 @@ class ImportBMDL(Operator, ImportHelper):
         maxlen=255, 
     )
 
+    files: CollectionProperty(name='Files', type=bpy.types.PropertyGroup)
 
     def execute(self, context):
-        return read_bmdl(context, self.filepath)
+        for filepath in self.files:
+            if read_bmdl(context, os.path.join(os.path.dirname(self.filepath), filepath.name)) == {'CANCELLED'}:
+                return {'CANCELLED'}
+        return {'FINISHED'}
 
 class ExportBMDL(Operator, ExportHelper):
     """Save a BRender model"""
