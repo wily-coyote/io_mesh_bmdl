@@ -1,6 +1,6 @@
 # io_mesh_bmdl
 
-Blender import/export addon for 3D Movie Maker's BMDL, based on [code written by Foone](https://github.com/foone/7gen)
+Blender import/export addon for 3D Movie Maker's BMDL, based on [code written by Foone](https://github.com/foone/7gen).
 Saves time exporting to OBJ and converting it to BMDL.
 
 ## Installation

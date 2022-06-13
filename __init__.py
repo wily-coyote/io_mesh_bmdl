@@ -69,7 +69,10 @@ def save_bmdl(context, filepath, selected_only):
             file.write(b"\x00"*12)
         for x in faces:
             file.write(struct.pack("<HHH", *x))
-            file.write(b"\x00"*26)
+            # file.write(b"\x00"*26)
+            file.write(b"\x00" * 10)
+            file.write(b"\x01")
+            file.write(b"\x00" * 15)
         bm.free()
     return {'FINISHED'}
 
