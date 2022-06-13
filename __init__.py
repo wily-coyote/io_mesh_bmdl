@@ -74,7 +74,7 @@ def save_bmdl(context, filepath, selected_only):
     return {'FINISHED'}
 
 class ImportBMDL(Operator, ImportHelper):
-    """Load a BRender model."""
+    """Load a BRender model"""
     bl_idname = "import_3dmm.brender"  
     bl_label = "Import BRender BMDL"
 
@@ -91,7 +91,7 @@ class ImportBMDL(Operator, ImportHelper):
         return read_bmdl(context, self.filepath)
 
 class ExportBMDL(Operator, ExportHelper):
-    """Save a BRender model."""
+    """Save a BRender model"""
     bl_idname = "export_3dmm.brender" 
     bl_label = "Export BRender BMDL"
 
