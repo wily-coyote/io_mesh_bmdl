@@ -77,6 +77,35 @@ def save_bmdl(context, filepath, selected_only):
         bm.free()
     return {'FINISHED'}
 
+def save_bmdl_object(context, filepath, objekt):
+    with open(os.path.join(os.path.dirname(filepath), objekt.name+".bmdl"), "wb") as file:
+        file.write(b"\x01\x00\x03\x03")
+        vertices = []
+        faces = []
+        bm = bmesh.new()
+        bm.from_mesh(mesh=objekt.data)
+        bmesh.ops.triangulate(bm, faces=bm.faces, quad_method="BEAUTY", ngon_method="BEAUTY")
+        bmesh.ops.split_edges(bm, edges=bm.edges) # this makes the uvs export ptoperlty
+        vertices = [list(x.co) for x in bm.verts]
+        vertices = [list(map(lambda x: int((x*10)*65536), x)) for x in vertices]
+        faces = [[y.index for y in x.verts] for x in bm.faces]
+        file.write(struct.pack("<HH", len(vertices), len(faces)))
+        file.write(b"\x00"*40)
+        for face in bm.faces:
+            for loop in face.loops:
+                vertices[loop.vert.index] = (vertices[loop.vert.index] + [int((x)*65536) for x in loop[bm.loops.layers.uv[0]].uv])
+        for x in vertices:
+            file.write(struct.pack("<lllll", *(x[:5])))
+            file.write(b"\x00"*12)
+        for x in faces:
+            file.write(struct.pack("<HHH", *x))
+            # file.write(b"\x00"*26)
+            file.write(b"\x00" * 10)
+            file.write(b"\x01")
+            file.write(b"\x00" * 15)
+        bm.free()
+    return {'FINISHED'}
+
 class ImportBMDL(Operator, ImportHelper):
     """Load a BRender model"""
     bl_idname = "import_3dmm.brender"  
@@ -117,8 +146,24 @@ class ExportBMDL(Operator, ExportHelper):
         default=True,
     )
 
+    separate: BoolProperty(
+        name="Export each object separately",
+        description="Export each object to separate BMDL files, will ignore file path and use object name",
+        default=False,
+    )
+
     def execute(self, context):
-        return save_bmdl(context, self.filepath, self.selected_only)
+        if self.separate:
+            objects = []
+            for obj in context.selected_objects if self.selected_only == True else context.scene.objects:
+                if obj.type == "MESH":
+                    objects.append(obj)
+            for obj in objects:
+                if save_bmdl_object(context, self.filepath, obj) == {'CANCELLED'}:
+                    return {'CANCELLED'}
+            return {'FINISHED'}
+        else:
+            return save_bmdl(context, self.filepath, self.selected_only)
 
 def menu_func_import(self, context):
     self.layout.operator(ImportBMDL.bl_idname, text="BRender (.bmdl)")
