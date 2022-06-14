@@ -43,67 +43,63 @@ def read_bmdl(context, filepath):
             return {"CANCELLED"}
     return {'FINISHED'}
 
+
+def to_bmdl(context, objekt):
+    data = b"\x01\x00\x03\x03"
+    vertices = []
+    faces = []
+    bm = bmesh.new()
+    if type(objekt) == list:
+        for objdata in objekt:
+            bm.from_mesh(mesh=objdata)
+    elif hasattr(objekt, "type") and objekt.type == "MESH":
+        bm.from_mesh(mesh=objekt.data)
+    else:
+        return None
+    bmesh.ops.triangulate(bm, faces=bm.faces, quad_method="BEAUTY", ngon_method="BEAUTY")
+    bmesh.ops.split_edges(bm, edges=bm.edges) # this makes the uvs export ptoperlty
+    vertices = [list(x.co) for x in bm.verts]
+    vertices = [list(map(lambda x: int((x*10)*65536), x)) for x in vertices]
+    faces = [[y.index for y in x.verts] for x in bm.faces]
+    data = data + (struct.pack("<HH", len(vertices), len(faces)))
+    data = data + (b"\x00"*40)
+    for face in bm.faces:
+        for loop in face.loops:
+            vertices[loop.vert.index] = (vertices[loop.vert.index] + [int((x)*65536) for x in loop[bm.loops.layers.uv[0]].uv]) # i don't like this
+    for x in vertices:
+        vert = x[:5]
+        vert=vert+([0]*(5-len(vert)))
+        data = data + (struct.pack("<lllll", *(vert)))
+        data = data + (b"\x00"*12)
+    for x in faces:
+        data = data + (struct.pack("<HHH", *x))
+        # data = data + (b"\x00"*26)
+        data = data + (b"\x00" * 10)
+        data = data + (b"\x01")
+        data = data + (b"\x00" * 15)
+    bm.free()
+    return data
+
 def save_bmdl(context, filepath, selected_only):
     meshes = []
     for obj in context.selected_objects if selected_only == True else scene.objects:
         if obj.type == "MESH":
             meshes.append(obj.data)
     with open(filepath, "wb") as file:
-        file.write(b"\x01\x00\x03\x03")
-        vertices = []
-        faces = []
-        bm = bmesh.new()
-        for mesh in meshes:
-            bm.from_mesh(mesh=mesh)
-        bmesh.ops.triangulate(bm, faces=bm.faces, quad_method="BEAUTY", ngon_method="BEAUTY")
-        bmesh.ops.split_edges(bm, edges=bm.edges) # this makes the uvs export ptoperlty
-        vertices = [list(x.co) for x in bm.verts]
-        vertices = [list(map(lambda x: int((x*10)*65536), x)) for x in vertices]
-        faces = [[y.index for y in x.verts] for x in bm.faces]
-        file.write(struct.pack("<HH", len(vertices), len(faces)))
-        file.write(b"\x00"*40)
-        for face in bm.faces:
-            for loop in face.loops:
-                vertices[loop.vert.index] = (vertices[loop.vert.index] + [int((x)*65536) for x in loop[bm.loops.layers.uv[0]].uv])
-        for x in vertices:
-            file.write(struct.pack("<lllll", *(x[:5])))
-            file.write(b"\x00"*12)
-        for x in faces:
-            file.write(struct.pack("<HHH", *x))
-            # file.write(b"\x00"*26)
-            file.write(b"\x00" * 10)
-            file.write(b"\x01")
-            file.write(b"\x00" * 15)
-        bm.free()
+        data = to_bmdl(context, meshes)
+        if data:
+            file.write(data)
+        else:
+            return {"CANCELLED"}
     return {'FINISHED'}
 
 def save_bmdl_object(context, filepath, objekt):
     with open(os.path.join(os.path.dirname(filepath), objekt.name+".bmdl"), "wb") as file:
-        file.write(b"\x01\x00\x03\x03")
-        vertices = []
-        faces = []
-        bm = bmesh.new()
-        bm.from_mesh(mesh=objekt.data)
-        bmesh.ops.triangulate(bm, faces=bm.faces, quad_method="BEAUTY", ngon_method="BEAUTY")
-        bmesh.ops.split_edges(bm, edges=bm.edges) # this makes the uvs export ptoperlty
-        vertices = [list(x.co) for x in bm.verts]
-        vertices = [list(map(lambda x: int((x*10)*65536), x)) for x in vertices]
-        faces = [[y.index for y in x.verts] for x in bm.faces]
-        file.write(struct.pack("<HH", len(vertices), len(faces)))
-        file.write(b"\x00"*40)
-        for face in bm.faces:
-            for loop in face.loops:
-                vertices[loop.vert.index] = (vertices[loop.vert.index] + [int((x)*65536) for x in loop[bm.loops.layers.uv[0]].uv])
-        for x in vertices:
-            file.write(struct.pack("<lllll", *(x[:5])))
-            file.write(b"\x00"*12)
-        for x in faces:
-            file.write(struct.pack("<HHH", *x))
-            # file.write(b"\x00"*26)
-            file.write(b"\x00" * 10)
-            file.write(b"\x01")
-            file.write(b"\x00" * 15)
-        bm.free()
+        data = to_bmdl(context, objekt)
+        if data:
+            file.write(data)
+        else:
+            return {"CANCELLED"}
     return {'FINISHED'}
 
 class ImportBMDL(Operator, ImportHelper):
